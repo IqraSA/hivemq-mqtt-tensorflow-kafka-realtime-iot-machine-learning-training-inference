@@ -22,9 +22,15 @@ bucket = client.get_bucket("car-demo-tensorflow-models")
 
 
 def kafka_dataset(servers, topic, offset, schema, eof=True):
-    print("Create: ", "{}:0:{}".format(topic, offset))
-    dataset = kafka_io.KafkaDataset(["{}:0:{}".format(topic, offset, offset)], servers=servers, group="cardata-v1",
-                                    eof=eof, config_global=kafka_config)
+    print("Create: ", f"{topic}:0:{offset}")
+    dataset = kafka_io.KafkaDataset(
+        [f"{topic}:0:{offset}"],
+        servers=servers,
+        group="cardata-v1",
+        eof=eof,
+        config_global=kafka_config,
+    )
+
 
     # remove kafka framing
     dataset = dataset.map(lambda e: tf.strings.substr(e, 5, -1))
@@ -164,7 +170,7 @@ topic = sys.argv[2]
 offset = sys.argv[3]
 result_topic = sys.argv[4]
 mode = sys.argv[5].strip().lower()
-if mode != "predict" and mode != "train":
+if mode not in ["predict", "train"]:
     print("Mode is invalid, must be either 'train' or 'predict':", mode)
     sys.exit(1)
 model_file = sys.argv[6]
@@ -211,9 +217,9 @@ if mode == "train":
     print("Training complete")
 
     # Store model into file:
-    model.save("/" + model_file)
+    model.save(f"/{model_file}")
     blob = bucket.blob(model_file)
-    blob.upload_from_filename("/" + model_file)
+    blob.upload_from_filename(f"/{model_file}")
     print("Model stored successfully ", model_file)
 
 
@@ -240,9 +246,9 @@ class OutputCallback(tf.keras.callbacks.Callback):
 if mode == "predict":
     print("Downloading model", model_file)
     blob = bucket.blob(model_file)
-    blob.download_to_filename("/" + model_file)
+    blob.download_to_filename(f"/{model_file}")
     print("Loading model")
-    model = tf.keras.models.load_model("/" + model_file)
+    model = tf.keras.models.load_model(f"/{model_file}")
 
     # create data for training
     dataset = kafka_dataset(servers, topic, offset, schema)
