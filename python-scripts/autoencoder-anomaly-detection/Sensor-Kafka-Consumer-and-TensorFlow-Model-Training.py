@@ -11,7 +11,7 @@ batch_size = 32
 # Autoencoder: 30 => 14 => 7 => 7 => 14 => 30 dimensions
 input_dim = 30 # train_x.shape[1] #num of columns, 30
 encoding_dim = 14
-hidden_dim = int(encoding_dim / 2) #i.e. 7
+hidden_dim = encoding_dim // 2
 learning_rate = 1e-7
 
 # Dense = fully connected layer
@@ -31,12 +31,14 @@ autoencoder.compile(metrics=['accuracy'],
 # NOTE: KafkaDataset processing
 def process_csv(entry):
   # "Time","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10","V11","V12","V13","V14","V15","V16","V17","V18","V19","V20","V21","V22","V23","V24","V25","V26","V27","V28","Amount","Class"
-  return tf.io.decode_csv(entry, [[0.0], *[[0.0] for i in range(28)], [0.0], [""]])
+  return tf.io.decode_csv(entry,
+                          [[0.0], *[[0.0] for _ in range(28)], [0.0], [""]])
 
 creditcard_dataset = kafka_io.KafkaDataset(['creditcard:0'], group='creditcard', eof=True).batch(batch_size).map(process_csv)
 
 def process_x_y(*entry):
-  return (tf.stack(entry[0:30], 1), tf.strings.to_number(entry[30], out_type=tf.int32))
+  return tf.stack(entry[:30], 1), tf.strings.to_number(
+      entry[30], out_type=tf.int32)
 
 train_dataset = creditcard_dataset.map(process_x_y)
 print(train_dataset)

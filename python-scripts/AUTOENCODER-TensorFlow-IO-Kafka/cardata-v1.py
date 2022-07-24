@@ -6,8 +6,11 @@ with open('cardata-v1.avsc') as f:
   schema = f.read()
 
 def kafka_dataset(servers, topic, offset, schema, eof=True):
-  print("Create: ", "{}:0:{}".format(topic, offset))
-  dataset = kafka_io.KafkaDataset(["{}:0:{}".format(topic, offset, offset)], servers=servers, group="cardata-v1", eof=eof)
+  print("Create: ", f"{topic}:0:{offset}")
+  dataset = kafka_io.KafkaDataset([f"{topic}:0:{offset}"],
+                                  servers=servers,
+                                  group="cardata-v1",
+                                  eof=eof)
 
   # remove kafka framing
   dataset = dataset.map(lambda e: tf.strings.substr(e, 5, -1))
@@ -134,7 +137,7 @@ import sys
 
 print("Options: ", sys.argv)
 
-if len(sys.argv) != 4 and len(sys.argv) != 5:
+if len(sys.argv) not in [4, 5]:
   print("Usage: python3 cardata-v1.py <servers> <topic> <offset> [result_topic]")
   sys.exit(1)
 
@@ -153,7 +156,7 @@ batch_size = 32
 # Autoencoder: 18 => 14 => 7 => 7 => 14 => 18 dimensions
 input_dim = 18 #num of columns, 18
 encoding_dim = 14
-hidden_dim = int(encoding_dim / 2) #i.e. 7
+hidden_dim = encoding_dim // 2
 learning_rate = 1e-7
 
 # Dense = fully connected layer 

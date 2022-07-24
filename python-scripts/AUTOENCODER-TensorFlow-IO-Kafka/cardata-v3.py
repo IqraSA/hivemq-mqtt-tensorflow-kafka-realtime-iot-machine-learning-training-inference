@@ -30,7 +30,7 @@ topic = sys.argv[2]
 offset = sys.argv[3]
 result_topic = sys.argv[4]
 mode = sys.argv[5].strip().lower()
-if mode != "predict" and mode != "train":
+if mode not in ["predict", "train"]:
     print("Mode is invalid, must be either 'train' or 'predict':", mode)
     sys.exit(1)
 model_file = sys.argv[6]
@@ -38,13 +38,19 @@ bucket_suffix = sys.argv[7]
 
 # Configure google storage bucket access
 client = storage.Client.from_service_account_json('/credentials/credentials.json')
-bucket = client.get_bucket("tf-models_" + bucket_suffix)
+bucket = client.get_bucket(f"tf-models_{bucket_suffix}")
 
 
 def kafka_dataset(servers, topic, offset, schema, eof=True):
-    print("Create: ", "{}:0:{}".format(topic, offset))
-    dataset = kafka_io.KafkaDataset(["{}:0:{}".format(topic, offset, offset)], servers=servers,
-                                    group="cardata-autoencoder", eof=eof, config_global=kafka_config)
+    print("Create: ", f"{topic}:0:{offset}")
+    dataset = kafka_io.KafkaDataset(
+        [f"{topic}:0:{offset}"],
+        servers=servers,
+        group="cardata-autoencoder",
+        eof=eof,
+        config_global=kafka_config,
+    )
+
 
     # remove kafka framing
     dataset = dataset.map(lambda e: tf.strings.substr(e, 5, -1))
@@ -179,7 +185,7 @@ batch_size = 100
 # Autoencoder: 18 => 14 => 7 => 7 => 14 => 18 dimensions
 input_dim = 18  # num of columns, 18
 encoding_dim = 14
-hidden_dim = int(encoding_dim / 2)  # i.e. 7
+hidden_dim = encoding_dim // 2
 learning_rate = 1e-7
 
 # Dense = fully connected layer
@@ -224,11 +230,11 @@ if mode == "train":
     print("Training complete")
 
     # Save the model
-    autoencoder.save("/" + model_file)
+    autoencoder.save(f"/{model_file}")
 
     # Store model into file:
-    blob = bucket.blob("/" + model_file)
-    blob.upload_from_filename("/" + model_file)
+    blob = bucket.blob(f"/{model_file}")
+    blob.upload_from_filename(f"/{model_file}")
     print("Model stored successfully", model_file)
 
 
@@ -254,11 +260,11 @@ class OutputCallback(tf.keras.callbacks.Callback):
 
 if mode == "predict":
     print("Downloading model", model_file)
-    blob = bucket.blob("/" + model_file)
-    blob.download_to_filename("/" + model_file)
+    blob = bucket.blob(f"/{model_file}")
+    blob.download_to_filename(f"/{model_file}")
     print("Loading model")
     # Recreate the exact same model purely from the file
-    new_autoencoder = tf.keras.models.load_model("/" + model_file)
+    new_autoencoder = tf.keras.models.load_model(f"/{model_file}")
 
     # Create predict dataset (with 200 data points)
     # Note: we don't need to  use `filter(lambda x, y: y == "false")` anymore
